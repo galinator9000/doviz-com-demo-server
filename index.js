@@ -49,6 +49,8 @@ let insertCurrencyRecord = async (record, currency) => {
         "value": record.close
     };
 
+    // Reconnect with the db
+    await dbclient.connect();
     const coll_currencyValues = dbclient.db(MONGODB_DB_NAME).collection("CurrencyValues");
     const result = await coll_currencyValues.insertOne(new_db_record);
     console.log("[*] Inserted new record:", JSON.stringify(new_db_record));
@@ -64,13 +66,14 @@ let synchronizeDovizComData = async () => {
     await currencies.forEach(currency => {
         getCurrencyDataDaily(currency).then(
             async (response) => {
-                // Reconnect with the db
-                await dbclient.connect();
-
-                // Process the each record of the currency query
-                await response.data.forEach(
-                    async (record) => await insertCurrencyRecord(record, currency)
-                );
+                if(response.error === true){
+                    console.error("[!] Doviz.com auth error.");
+                }else{
+                    // Process the each record of the currency query
+                    await response.data.forEach(
+                        async (record) => await insertCurrencyRecord(record, currency)
+                    );
+                }
             }
         )
     });
