@@ -1,15 +1,16 @@
 // Load .env
 require('dotenv').config();
 
-// Import local functions
+/// Import local functions
+// Doviz.com queries
 const { getCurrencyDataDaily } = require("./dovizcom-queries");
+// Methods related to our database operations
+const { insertCurrencyRecord } = require("./db_queries");
+// Constants
+const { MONGODB_URI, MONGODB_DB_NAME } = require("./consts");
 
 // Import mongodb package
 const { MongoClient, ServerApiVersion } = require('mongodb');
-
-// Build the URI that is required to connect to the mongodb cluster
-const MONGODB_URI = `mongodb+srv://${process.env.DB_USERNAME}:${process.env.DB_PASSWORD}@${process.env.DB_ADDRESS}/`;
-const MONGODB_DB_NAME = "doviz-app";
 
 // Variable that will hold the mongodb client object
 const dbclient = new MongoClient(
@@ -42,20 +43,6 @@ let closeDatabaseConnection = async () => {
     }
 };
 
-let insertCurrencyRecord = async (record, currency) => {
-    const new_db_record = {
-        "timestamp": new Date(record.update_date * 1000),
-        "currency": currency.code,
-        "value": record.close
-    };
-
-    // Reconnect with the db
-    await dbclient.connect();
-    const coll_currencyValues = dbclient.db(MONGODB_DB_NAME).collection("CurrencyValues");
-    const result = await coll_currencyValues.insertOne(new_db_record);
-    console.log("[*] Inserted new record:", JSON.stringify(new_db_record));
-};
-
 // Synchronizes doviz.com data
 let synchronizeDovizComData = async () => {
     // Get all the currencies from OUR database, it specifies which currencies to track on doviz.com
@@ -70,9 +57,10 @@ let synchronizeDovizComData = async () => {
                     console.error("[!] Doviz.com auth error.");
                 }else{
                     // Process the each record of the currency query
-                    await response.data.forEach(
-                        async (record) => await insertCurrencyRecord(record, currency)
+                    response.data.forEach(
+                        (record) => insertCurrencyRecord(dbclient, record, currency)
                     );
+                    console.log(`[*] Inserting ${response.data.length} new records for the currency ${currency.code}...`);
                 }
             }
         )
