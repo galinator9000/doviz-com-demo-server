@@ -1,27 +1,25 @@
 // Load .env
 require('dotenv').config();
 
-/// Import local functions
+// Import express.js
+const express = require('express');
 
+/// Import local functions
 // Doviz.com queries
 const { getCurrencyDataDaily } = require("./dovizcom-queries");
-
 // Methods and objects related to our database operations
 const {
     dbclient,
     initDatabaseConnection,
     closeDatabaseConnection,
-    insertCurrencyRecord
+    insertCurrencyRecord,
+    getCurrenciesToTrack
 } = require("./db_queries");
 
-// Constants
-const { MONGODB_DB_NAME } = require("./consts");
-
 // Synchronizes doviz.com data
-let synchronizeDovizComData = async () => {
+const synchronizeExchangeData = async () => {
     // Get all the currencies from OUR database, it specifies which currencies to track on doviz.com
-    const coll_currenciesToTrack = dbclient.db(MONGODB_DB_NAME).collection("CurrenciesToTrack");
-    const currencies = await coll_currenciesToTrack.find({}).toArray();
+    const currencies = await getCurrenciesToTrack();
 
     // Query and process each currency data from doviz.com
     await currencies.forEach(currency => {
@@ -41,16 +39,24 @@ let synchronizeDovizComData = async () => {
     });
 };
 
-// Main entrypoint of the script
-const main = async () => {
-    // Construct the MongoDB client object
-    await initDatabaseConnection();
+// Build the web serving application and serve it
+const app = express();
 
-    // Synchronize data doviz.com data
-    await synchronizeDovizComData();
+// API endpoints of our backend-side server application
+app.get('/getCurrencyValues', async (req, res) => {
+    res.send(await getCurrencyValues());
+})
+app.get('/getCurrenciesToTrack', async (req, res) => {
+    res.send(await getCurrenciesToTrack());
+})
+app.get('/synchronizeExchangeData', async (req, res) => {
+    res.send(await synchronizeExchangeData());
+})
 
-    // Close the database connection
-    await closeDatabaseConnection();
-}
-
-main().catch(console.log);
+app.listen(
+    process.env.PORT,
+    async () => {
+        console.log(`Express app is running on port ${process.env.PORT}!`);
+        await initDatabaseConnection();
+    }
+);
