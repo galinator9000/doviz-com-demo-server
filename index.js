@@ -2,7 +2,7 @@
 require('dotenv').config();
 
 // Import local functions
-const { getCurrencyDataWeekly, getCurrencyDataDaily } = require("./dovizcom-queries");
+const { getCurrencyDataDaily } = require("./dovizcom-queries");
 
 // Import mongodb package
 const { MongoClient, ServerApiVersion } = require('mongodb');
@@ -49,11 +49,9 @@ let insertCurrencyRecord = async (record, currency) => {
         "value": record.close
     };
 
-
     const coll_currencyValues = dbclient.db(MONGODB_DB_NAME).collection("CurrencyValues");
     const result = await coll_currencyValues.insertOne(new_db_record);
-    console.log("[*] Inserted new record:", result.insertedId);
-    console.log(JSON.stringify(new_db_record));
+    console.log("[*] Inserted new record:", JSON.stringify(new_db_record));
 };
 
 // Synchronizes doviz.com data
@@ -62,13 +60,19 @@ let synchronizeDovizComData = async () => {
     const coll_currenciesToTrack = dbclient.db(MONGODB_DB_NAME).collection("CurrenciesToTrack");
     const currencies = await coll_currenciesToTrack.find({}).toArray();
 
-    // Query and process each currency data
-    await currencies.forEach(async (currency) => {
-        let cur_values = await getCurrencyDataDaily(currency);
-        await dbclient.connect();
-        await cur_values.data.forEach(
-            async (record) => await insertCurrencyRecord(record, currency)
-        );
+    // Query and process each currency data from doviz.com
+    await currencies.forEach(currency => {
+        getCurrencyDataDaily(currency).then(
+            async (response) => {
+                // Reconnect with the db
+                await dbclient.connect();
+
+                // Process the each record of the currency query
+                await response.data.forEach(
+                    async (record) => await insertCurrencyRecord(record, currency)
+                );
+            }
+        )
     });
 };
 

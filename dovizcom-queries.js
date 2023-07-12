@@ -28,9 +28,19 @@ let getCurrencyDataWeekly = async (currency) => {
 
 // Gets the specified currency's data daily
 let getCurrencyDataDaily = async (currency) => {
+    // Build the query url
+    let query_url = `https://www.doviz.com/api/v11/assets/${currency.code}/daily`;
+
+    // Get the response and return it
+    let response = await fetch(query_url, {headers: DOVIZ_COM_HEADERS})
+    return await response.json();
+};
+
+// Gets the specified currency's live records
+let getCurrencyDataLive = async (currency) => {
     const limit = "60";
 
-    // Build the daily query url
+    // Build the query url
     let query_url = (
         `https://www.doviz.com/api/v11/assets/${currency.code}/daily?` + new URLSearchParams({"limit": limit})
     );
@@ -42,5 +52,6 @@ let getCurrencyDataDaily = async (currency) => {
 
 module.exports = {
     getCurrencyDataWeekly,
-    getCurrencyDataDaily
+    getCurrencyDataDaily,
+    getCurrencyDataLive,
 }
