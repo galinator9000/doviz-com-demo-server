@@ -107,14 +107,14 @@ const getAllCurrencyCurrentValues = async () => {
     let allCurrencyValues = await (coll_currencyValues.find({}).toArray());
 
     const coll_currenciesToTrack = dbclient.db(MONGODB_DB_NAME).collection("CurrenciesToTrack");
-    let currencies = await (coll_currenciesToTrack.find({}).sort({timestamp: -1}).toArray());
+    let currencies = await (coll_currenciesToTrack.find({}).sort({timestamp: 1}).toArray());
     currencies = currencies.map(currency => {
         const currentCurrencyValues = allCurrencyValues.filter((record) => (currency.code === record.currency));
         return {
             ...currency,
             values: currentCurrencyValues,
-            value: currentCurrencyValues[0].value,
-            timestamp: currentCurrencyValues[0].timestamp,
+            value: currentCurrencyValues[currentCurrencyValues.length-1].value,
+            timestamp: currentCurrencyValues[currentCurrencyValues.length-1].timestamp,
         };
     });
 
