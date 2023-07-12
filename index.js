@@ -2,46 +2,20 @@
 require('dotenv').config();
 
 /// Import local functions
+
 // Doviz.com queries
 const { getCurrencyDataDaily } = require("./dovizcom-queries");
-// Methods related to our database operations
-const { insertCurrencyRecord } = require("./db_queries");
+
+// Methods and objects related to our database operations
+const {
+    dbclient,
+    initDatabaseConnection,
+    closeDatabaseConnection,
+    insertCurrencyRecord
+} = require("./db_queries");
+
 // Constants
-const { MONGODB_URI, MONGODB_DB_NAME } = require("./consts");
-
-// Import mongodb package
-const { MongoClient, ServerApiVersion } = require('mongodb');
-
-// Variable that will hold the mongodb client object
-const dbclient = new MongoClient(
-    MONGODB_URI, 
-    {
-        serverApi: {
-            version: ServerApiVersion.v1
-        }
-    }
-);
-
-// Connects and tests the db connection
-let initDatabaseConnection = async () => {
-    try{
-        await dbclient.connect();
-        await dbclient.db(MONGODB_DB_NAME).command({ ping: 1 });
-        console.log("[*] Database connection successful.");
-    }catch(e){
-        await dbclient.close();
-        console.error(e);
-    }
-};
-
-// Terminates the db connection
-let closeDatabaseConnection = async () => {
-    try{
-        await dbclient.close();
-    }catch(e){
-        console.error(e);
-    }
-};
+const { MONGODB_DB_NAME } = require("./consts");
 
 // Synchronizes doviz.com data
 let synchronizeDovizComData = async () => {
@@ -58,9 +32,9 @@ let synchronizeDovizComData = async () => {
                 }else{
                     // Process the each record of the currency query
                     response.data.forEach(
-                        (record) => insertCurrencyRecord(dbclient, record, currency)
+                        (record) => insertCurrencyRecord(record, currency)
                     );
-                    console.log(`[*] Inserting ${response.data.length} new records for the currency ${currency.code}...`);
+                    console.log(`[*] Entering ${response.data.length} records to the db for the currency ${currency.code}...`);
                 }
             }
         )
