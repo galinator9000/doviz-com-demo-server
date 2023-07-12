@@ -42,16 +42,33 @@ let closeDatabaseConnection = async () => {
     }
 };
 
+let insertCurrencyRecord = async (record, currency) => {
+    const new_db_record = {
+        "timestamp": new Date(record.update_date * 1000),
+        "currency": currency.code,
+        "value": record.close
+    };
+
+
+    const coll_currencyValues = dbclient.db(MONGODB_DB_NAME).collection("CurrencyValues");
+    const result = await coll_currencyValues.insertOne(new_db_record);
+    console.log("[*] Inserted new record:", result.insertedId);
+    console.log(JSON.stringify(new_db_record));
+};
+
 // Synchronizes doviz.com data
 let synchronizeDovizComData = async () => {
     // Get all the currencies from OUR database, it specifies which currencies to track on doviz.com
     const coll_currenciesToTrack = dbclient.db(MONGODB_DB_NAME).collection("CurrenciesToTrack");
     const currencies = await coll_currenciesToTrack.find({}).toArray();
 
-    // Process each currency data
-    currencies.forEach(async (currency) => {
+    // Query and process each currency data
+    await currencies.forEach(async (currency) => {
         let cur_values = await getCurrencyDataDaily(currency);
-        console.log(cur_values);
+        await dbclient.connect();
+        await cur_values.data.forEach(
+            async (record) => await insertCurrencyRecord(record, currency)
+        );
     });
 };
 
@@ -66,5 +83,5 @@ const main = async () => {
     // Close the database connection
     await closeDatabaseConnection();
 }
-  
-  main().catch(console.log);
+
+main().catch(console.log);
