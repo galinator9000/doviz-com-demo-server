@@ -97,11 +97,36 @@ const getCurrenciesToTrack = async (currencyCode) => {
     return result;
 };
 
+// Gets the given currency's current values held in DB, dashboard format
+const getAllCurrencyCurrentValues = async () => {
+    // Reconnect with the db
+    await dbclient.connect();
+
+    // Get the collections
+    const coll_currencyValues = dbclient.db(MONGODB_DB_NAME).collection("CurrencyValues");
+    let allCurrencyValues = await (coll_currencyValues.find({}).toArray());
+
+    const coll_currenciesToTrack = dbclient.db(MONGODB_DB_NAME).collection("CurrenciesToTrack");
+    let currencies = await (coll_currenciesToTrack.find({}).sort({timestamp: -1}).toArray());
+    currencies = currencies.map(currency => {
+        const currentCurrencyValues = allCurrencyValues.filter((record) => (currency.code === record.currency));
+        return {
+            ...currency,
+            values: currentCurrencyValues,
+            value: currentCurrencyValues[0].value,
+            timestamp: currentCurrencyValues[0].timestamp,
+        };
+    });
+
+    return currencies;
+};
+
 module.exports = {
     dbclient,
     initDatabaseConnection,
     closeDatabaseConnection,
     insertCurrencyRecord,
     getCurrencyValues,
-    getCurrenciesToTrack
+    getCurrenciesToTrack,
+    getAllCurrencyCurrentValues,
 }

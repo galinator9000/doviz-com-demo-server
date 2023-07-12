@@ -3,17 +3,20 @@ require('dotenv').config();
 
 // Import express.js
 const express = require('express');
+const cors = require('cors');
 
 /// Import local functions
 // Doviz.com queries
-const { getCurrencyDataDaily } = require("./dovizcom-queries");
+const { getCurrencyDataDaily } = require("./dovizcom_queries");
 // Methods and objects related to our database operations
 const {
     dbclient,
     initDatabaseConnection,
     closeDatabaseConnection,
     insertCurrencyRecord,
-    getCurrenciesToTrack
+    getCurrenciesToTrack,
+    getCurrencyValues,
+    getAllCurrencyCurrentValues
 } = require("./db_queries");
 
 // Synchronizes doviz.com data
@@ -42,7 +45,12 @@ const synchronizeExchangeData = async () => {
 // Build the web serving application and serve it
 const app = express();
 
+app.use(cors());
+
 // API endpoints of our backend-side server application
+app.get('/getAllCurrencyCurrentValues', async (req, res) => {
+    res.send(await getAllCurrencyCurrentValues());
+})
 app.get('/getCurrencyValues', async (req, res) => {
     res.send(await getCurrencyValues());
 })
