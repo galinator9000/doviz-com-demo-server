@@ -104,10 +104,10 @@ const getAllCurrencyCurrentValues = async () => {
 
     // Get the collections
     const coll_currencyValues = dbclient.db(MONGODB_DB_NAME).collection("CurrencyValues");
-    let allCurrencyValues = await (coll_currencyValues.find({}).toArray());
+    let allCurrencyValues = await (coll_currencyValues.find({}).sort({timestamp: -1}).toArray());
 
     const coll_currenciesToTrack = dbclient.db(MONGODB_DB_NAME).collection("CurrenciesToTrack");
-    let currencies = await (coll_currenciesToTrack.find({}).sort({timestamp: 1}).toArray());
+    let currencies = await (coll_currenciesToTrack.find({}).toArray());
     currencies = currencies.map(currency => {
         const currentCurrencyValues = allCurrencyValues.filter((record) => (currency.code === record.currency));
         // Return null if no value exist for the currency
@@ -122,8 +122,8 @@ const getAllCurrencyCurrentValues = async () => {
         return {
             ...currency,
             values: currentCurrencyValues,
-            value: currentCurrencyValues[currentCurrencyValues.length-1].value,
-            timestamp: currentCurrencyValues[currentCurrencyValues.length-1].timestamp,
+            value: currentCurrencyValues[0].value,
+            timestamp: currentCurrencyValues[0].timestamp,
         };
     });
 
@@ -140,23 +140,50 @@ const checkUserCurrencyAlerts = async () => {
     // Get the collections
     const coll_userCurrencyAlerts = dbclient.db(MONGODB_DB_NAME).collection("UserCurrencyAlerts");
     let allUserCurrencyAlerts = await (coll_userCurrencyAlerts.find({}).toArray());
+
     const coll_currencyValues = dbclient.db(MONGODB_DB_NAME).collection("CurrencyValues");
-    let allCurrencyValues = await (coll_currencyValues.find({}).toArray());
+    let allCurrencyValues = await (coll_currencyValues.find({}).sort({timestamp: -1}).toArray());
 
     // Check the alert criteria from the other collection
-    let triggeredAlerts = allUserCurrencyAlerts.filter((alert) => {
-        let alertIsTriggered = false;
-
+    let allAlerts = allUserCurrencyAlerts.map((alert) => {
         // Get the currency records
-        const currentCurrencyValues = allCurrencyValues.filter((record) => (alert.currency === record.currency));
+        const currentCurrencyValues = allCurrencyValues.filter((record) => (alert.currencyCode === record.currency));
+        let upToDateValueOfCurrency = currentCurrencyValues[0].value;
+        let upToDateAvgValueOfCurrency = upToDateValueOfCurrency * 0.002
+        let upToDateAvgHours = 5;
 
         // Determine if the alert is gonna be triggered
-        //// TO DO
-        alertIsTriggered = true;
+        alert.messages = [];
+        if(alert.alertType === "exceed"){
+            if(upToDateValueOfCurrency > (alert.alertValue)){
+                alert.isTriggered = true;
+                alert.messages.push(
+                    `${alert.currencyCode} dövizi, belirlediğiniz ${alert.alertValue.toFixed(2)} sınırını ${upToDateValueOfCurrency.toFixed(2)} olarak geçti!`
+                );
+            }
+            if(upToDateValueOfCurrency > (alert.alertValue * 1.10)){
+                alert.isTriggered = true;
+                alert.messages.push(
+                    `${alert.currencyCode} dövizi, belirlediğiniz ${alert.alertValue.toFixed(2)} limitini %${
+                        (((upToDateValueOfCurrency/alert.alertValue)-1)*100).toFixed(2)
+                    } geçerek ${upToDateValueOfCurrency.toFixed(2)} oldu!`
+                );
+            }
+            if(upToDateValueOfCurrency > (upToDateAvgValueOfCurrency * 1.10)){
+                alert.isTriggered = true;
+                alert.messages.push(
+                    `${alert.currencyCode} dövizi, son ${upToDateAvgHours} saat ortalaması olan ${upToDateAvgValueOfCurrency.toFixed(2)} değerinin %${
+                        (((upToDateValueOfCurrency/upToDateAvgValueOfCurrency)-1)*100).toFixed(2)
+                    } üstünde!`
+                );
+            }
+        }
 
-        return alertIsTriggered;
+        return alert;
     });
 
+    // Filter the non-null values
+    let triggeredAlerts = allAlerts.filter(x => x.isTriggered);
     if(triggeredAlerts.length > 0){
         console.log("[*] Triggered alerts:");
         console.log(triggeredAlerts);
@@ -166,6 +193,43 @@ const checkUserCurrencyAlerts = async () => {
     return triggeredAlerts;
 }
 
+const getUserCurrencyAlerts = async () => {
+    // Reconnect with the db
+    await dbclient.connect();
+
+    // Get the collections
+    const coll_userCurrencyAlerts = dbclient.db(MONGODB_DB_NAME).collection("UserCurrencyAlerts");
+    let allUserCurrencyAlerts = await (coll_userCurrencyAlerts.find({}).toArray());
+
+    return allUserCurrencyAlerts
+};
+
+const setUserCurrencyAlert = async (newAlertData) => {
+    try{
+        // Reconnect with the db
+        await dbclient.connect();
+
+        // Get the collections
+        const coll_userCurrencyAlerts = dbclient.db(MONGODB_DB_NAME).collection("UserCurrencyAlerts");
+
+        console.log(newAlertData);
+
+        // "Upsert" the new records
+        await coll_userCurrencyAlerts.updateOne(
+            {
+                "currencyCode": newAlertData.currencyCode,
+                "alertType": newAlertData.alertType
+            },
+            {$set: newAlertData},
+            {upsert: true}
+        );
+
+        return true;
+    }catch(e){
+        return false;
+    }
+};
+
 module.exports = {
     dbclient,
     initDatabaseConnection,
@@ -174,5 +238,7 @@ module.exports = {
     getCurrencyValues,
     getCurrenciesToTrack,
     getAllCurrencyCurrentValues,
-    checkUserCurrencyAlerts
+    checkUserCurrencyAlerts,
+    getUserCurrencyAlerts,
+    setUserCurrencyAlert
 }

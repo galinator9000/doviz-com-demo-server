@@ -23,7 +23,9 @@ const {
     getCurrenciesToTrack,
     getCurrencyValues,
     getAllCurrencyCurrentValues,
-    checkUserCurrencyAlerts
+    checkUserCurrencyAlerts,
+    getUserCurrencyAlerts,
+    setUserCurrencyAlert
 } = require("./db_queries");
 
 // Synchronizes doviz.com data
@@ -56,6 +58,8 @@ const synchronizeExchangeData = async () => {
 // Build the web serving application and serve it
 const app = express();
 
+app.use(express.json());
+
 // Add the extra middlewares.
 expressWs(app);
 app.use(cors());
@@ -73,6 +77,12 @@ app.get('/getCurrenciesToTrack', async (req, res) => {
 app.get('/synchronizeExchangeData', async (req, res) => {
     res.send(await synchronizeExchangeData());
 })
+app.get('/getUserCurrencyAlerts', async (req, res) => {
+    res.send(await getUserCurrencyAlerts());
+})
+app.post('/setUserCurrencyAlert', async (req, res) => {
+    res.send(await setUserCurrencyAlert(req.body));
+})
 
 // Setup the alert system through websocket
 app.ws(
@@ -82,8 +92,8 @@ app.ws(
             "message",
             (msg) => {
                 if(msg === "CHECK_USER_TRIGGERS"){
-                    checkUserCurrencyAlerts().then(triggeredAlerts => {
-                        ws.send(triggeredAlerts);
+                    checkUserCurrencyAlerts().then((triggeredAlerts) => {
+                        ws.send(JSON.stringify(triggeredAlerts));
                     })
                 }
             }
