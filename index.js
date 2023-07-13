@@ -71,11 +71,15 @@ app.get('/synchronizeExchangeData', async (req, res) => {
 app.listen(
     process.env.PORT,
     async () => {
-        console.log(`Express app is running on port ${process.env.PORT}!`);
+        console.log(`[*] Express app is running on port ${process.env.PORT}!`);
         await initDatabaseConnection();
+
+        console.log("[*] Checking doviz.com auth...");
         if(!checkDovizComAuth()){
-            console.error("[!] Doviz.com auth failed, refreshing auth..");
+            console.error("[!] Doviz.com auth failed, refreshing auth...");
             await updateDovizComAuth();
+        }else{
+            console.log("[+] Doviz.com auth valid!");
         }
     }
 );
