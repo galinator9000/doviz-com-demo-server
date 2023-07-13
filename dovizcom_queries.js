@@ -32,7 +32,7 @@ let updateDovizComAuth = async () => {
     let ppBrowser = await puppeteer.launch({
         args: ["--no-sandbox"],
         executablePath: executablePath(),
-        headless: true
+        headless: "new"
     });
     let ppPage = (await ppBrowser.pages())[0];
     await ppPage.setRequestInterception(true);
@@ -73,10 +73,12 @@ let updateDovizComAuth = async () => {
         await ppPage.close();
         await ppBrowser.close();
         DOVIZ_COM_HEADERS.Authorization = NEW_AUTH_TOKEN;
+        return true;
     }else{
         console.log("[x] Updating doviz.com auth token failed!");
         await ppPage.close();
         await ppBrowser.close();
+        return false;
     }
 };
 

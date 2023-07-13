@@ -25,7 +25,8 @@ const {
     getAllCurrencyCurrentValues,
     checkUserCurrencyAlerts,
     getUserCurrencyAlerts,
-    setUserCurrencyAlert
+    setUserCurrencyAlert,
+    removeUserCurrencyAlert
 } = require("./db_queries");
 
 // Synchronizes doviz.com data
@@ -40,7 +41,13 @@ const synchronizeExchangeData = async () => {
         let response = getCurrencyDataDaily(currency);
         if(response.error === true){
             console.error("[!] Doviz.com auth error, refreshing auth..");
-            updateDovizComAuth();
+
+            // Re-run the sync function after renewing the auth token
+            updateDovizComAuth().then((isAuthSuccessful) => {
+                if(isAuthSuccessful){
+                    synchronizeExchangeData();
+                }
+            });
             return false;
         }else{
             // Process the each record of the currency query
@@ -82,6 +89,9 @@ app.get('/getUserCurrencyAlerts', async (req, res) => {
 })
 app.post('/setUserCurrencyAlert', async (req, res) => {
     res.send(await setUserCurrencyAlert(req.body));
+})
+app.post('/removeUserCurrencyAlert', async (req, res) => {
+    res.send(await removeUserCurrencyAlert(req.body));
 })
 
 // Setup the alert system through websocket

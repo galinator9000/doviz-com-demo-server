@@ -3,6 +3,7 @@ require('dotenv').config();
 
 // Constants
 const { MONGODB_URI, MONGODB_DB_NAME } = require("./consts");
+const { sumArray } = require("./utils");
 
 var md5 = require('md5');
 
@@ -142,18 +143,38 @@ const checkUserCurrencyAlerts = async () => {
     let allUserCurrencyAlerts = await (coll_userCurrencyAlerts.find({}).toArray());
 
     const coll_currencyValues = dbclient.db(MONGODB_DB_NAME).collection("CurrencyValues");
-    let allCurrencyValues = await (coll_currencyValues.find({}).sort({timestamp: -1}).toArray());
+    let now_timestamp = new Date();
+    let hrsago_timestamp = new Date(now_timestamp.getTime() - (3600 * parseInt(process.env.CALCULATE_LAST_AVERAGE_HOURS) * 1000));
+
+    let allCurrencyValues = await (coll_currencyValues.find({
+        timestamp: {
+            $gte: hrsago_timestamp,
+            $lt: now_timestamp
+        }
+    }).sort({timestamp: -1}).toArray());
 
     // Check the alert criteria from the other collection
     let allAlerts = allUserCurrencyAlerts.map((alert) => {
+        alert.messages = [];
+        alert.isTriggered = false;
+
+        // Skip the alert if it's already sent to the user
+        if(alert.isSentToUser) return alert;
+
         // Get the currency records
         const currentCurrencyValues = allCurrencyValues.filter((record) => (alert.currencyCode === record.currency));
-        let upToDateValueOfCurrency = currentCurrencyValues[0].value;
-        let upToDateAvgValueOfCurrency = upToDateValueOfCurrency * 0.002
-        let upToDateAvgHours = 5;
 
+        if(currentCurrencyValues.length === 0) return alert;
+
+        let upToDateValueOfCurrency = currentCurrencyValues[0].value;
+        let leastUpToDateTimestamp = new Date(currentCurrencyValues[currentCurrencyValues.length-1].timestamp).getTime();
+
+        // Calculate the average value of current currency's records
+        let sumOfLastRecords = sumArray(currentCurrencyValues.map(x => x.value));
+        let upToDateAvgValueOfCurrency = (sumOfLastRecords / currentCurrencyValues.length)
+        let upToDateAvgHours = ((now_timestamp.getTime() - leastUpToDateTimestamp) / (3600 * 1000)).toFixed(2);
+        
         // Determine if the alert is gonna be triggered
-        alert.messages = [];
         if(alert.alertType === "exceed"){
             if(upToDateValueOfCurrency > (alert.alertValue)){
                 alert.isTriggered = true;
@@ -177,6 +198,17 @@ const checkUserCurrencyAlerts = async () => {
                     } üstünde!`
                 );
             }
+        }
+
+        // Update the alert's database record as "sent to user"
+        if(process.env.SEND_USER_TRIGGERS_ONLY_ONCE === "true" && alert.isTriggered){
+            coll_userCurrencyAlerts.updateOne(
+                {"_id": alert._id},
+                {$set: {
+                    isSentToUser: true
+                }},
+                {upsert: false}
+            );
         }
 
         return alert;
@@ -212,8 +244,6 @@ const setUserCurrencyAlert = async (newAlertData) => {
         // Get the collections
         const coll_userCurrencyAlerts = dbclient.db(MONGODB_DB_NAME).collection("UserCurrencyAlerts");
 
-        console.log(newAlertData);
-
         // "Upsert" the new records
         await coll_userCurrencyAlerts.updateOne(
             {
@@ -222,6 +252,28 @@ const setUserCurrencyAlert = async (newAlertData) => {
             },
             {$set: newAlertData},
             {upsert: true}
+        );
+
+        return true;
+    }catch(e){
+        return false;
+    }
+};
+
+const removeUserCurrencyAlert = async (removeAlertData) => {
+    try{
+        // Reconnect with the db
+        await dbclient.connect();
+
+        // Get the collections
+        const coll_userCurrencyAlerts = dbclient.db(MONGODB_DB_NAME).collection("UserCurrencyAlerts");
+
+        // Remove the specified records
+        await coll_userCurrencyAlerts.deleteMany(
+            {
+                "currencyCode": removeAlertData.currencyCode,
+                "alertType": removeAlertData.alertType
+            }
         );
 
         return true;
@@ -240,5 +292,6 @@ module.exports = {
     getAllCurrencyCurrentValues,
     checkUserCurrencyAlerts,
     getUserCurrencyAlerts,
-    setUserCurrencyAlert
+    setUserCurrencyAlert,
+    removeUserCurrencyAlert
 }
