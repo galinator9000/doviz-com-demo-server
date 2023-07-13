@@ -5,6 +5,9 @@ require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 
+// Import cron for periodically syncing with doviz.com
+const cron = require('node-cron');
+
 /// Import local functions
 // Doviz.com queries
 const { getCurrencyDataDaily, checkDovizComAuth, updateDovizComAuth } = require("./dovizcom_queries");
@@ -75,4 +78,10 @@ app.listen(
             await updateDovizComAuth();
         }
     }
+);
+
+// Set cron schedules.
+cron.schedule(
+    "*/15 * * * *",
+    synchronizeExchangeData
 );
