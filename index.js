@@ -13,7 +13,7 @@ const cron = require('node-cron');
 
 /// Import local functions
 // Doviz.com queries
-const { getCurrencyDataDaily, checkDovizComAuth, updateDovizComAuth } = require("./dovizcom_queries");
+const { getCurrencyDataDaily, getCurrencyDataLive, checkDovizComAuth, updateDovizComAuth } = require("./dovizcom_queries");
 // Methods and objects related to our database operations
 const {
     dbclient,
@@ -30,7 +30,7 @@ const {
 } = require("./db_queries");
 
 // Synchronizes doviz.com data
-const synchronizeExchangeData = async () => {
+const synchronizeExchangeData = async (pullDovizComDataFn) => {
     // Get all the currencies from OUR database, it specifies which currencies to track on doviz.com
     const currencies = await getCurrenciesToTrack();
 
@@ -38,14 +38,14 @@ const synchronizeExchangeData = async () => {
     for(let cIdx=0; cIdx <= currencies.length-1; cIdx++){
         let currency = currencies[cIdx];
 
-        let response = getCurrencyDataDaily(currency);
+        let response = pullDovizComDataFn(currency);
         if(response.error === true){
             console.error("[!] Doviz.com auth error, refreshing auth..");
 
             // Re-run the sync function after renewing the auth token
             updateDovizComAuth().then((isAuthSuccessful) => {
                 if(isAuthSuccessful){
-                    synchronizeExchangeData();
+                    synchronizeExchangeData(pullDovizComDataFn);
                 }
             });
             return false;
@@ -82,7 +82,7 @@ app.get('/getCurrenciesToTrack', async (req, res) => {
     res.send(await getCurrenciesToTrack());
 })
 app.get('/synchronizeExchangeData', async (req, res) => {
-    res.send(await synchronizeExchangeData());
+    res.send(await synchronizeExchangeData(getCurrencyDataDaily));
 })
 app.get('/getUserCurrencyAlerts', async (req, res) => {
     res.send(await getUserCurrencyAlerts());
@@ -118,17 +118,18 @@ app.listen(
         await initDatabaseConnection();
 
         console.log("[*] Checking doviz.com auth...");
-        if(!checkDovizComAuth()){
+        while(!checkDovizComAuth()){
             console.error("[!] Doviz.com auth failed, refreshing auth...");
             await updateDovizComAuth();
-        }else{
-            console.log("[+] Doviz.com auth valid!");
-        }
-    }
-);
+        };
 
-// Set cron schedules.
-cron.schedule(
-    "*/15 * * * *",
-    synchronizeExchangeData
+        console.log("[+] Doviz.com auth valid!");
+        await synchronizeExchangeData(getCurrencyDataDaily);
+
+        // Set cron schedules.
+        cron.schedule(
+            "*/1 * * * *",
+            () => synchronizeExchangeData(getCurrencyDataLive)
+        );
+    }
 );
