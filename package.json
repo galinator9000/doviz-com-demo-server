@@ -17,6 +17,10 @@
     "md5": "^2.3.0",
     "moment": "^2.29.4",
     "mongodb": "^5.7.0",
-    "node-fetch": "^2.6.12"
+    "node-fetch": "^2.6.12",
+    "puppeteer": "^20.8.2",
+    "puppeteer-extra": "^3.3.6",
+    "puppeteer-extra-plugin-stealth": "^2.11.2",
+    "sync-fetch": "^0.5.2"
   }
 }

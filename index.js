@@ -7,7 +7,7 @@ const cors = require('cors');
 
 /// Import local functions
 // Doviz.com queries
-const { getCurrencyDataDaily } = require("./dovizcom_queries");
+const { getCurrencyDataDaily, checkDovizComAuth, updateDovizComAuth } = require("./dovizcom_queries");
 // Methods and objects related to our database operations
 const {
     dbclient,
@@ -25,21 +25,25 @@ const synchronizeExchangeData = async () => {
     const currencies = await getCurrenciesToTrack();
 
     // Query and process each currency data from doviz.com
-    await currencies.forEach(currency => {
-        getCurrencyDataDaily(currency).then(
-            async (response) => {
-                if(response.error === true){
-                    console.error("[!] Doviz.com auth error.");
-                }else{
-                    // Process the each record of the currency query
-                    response.data.forEach(
-                        (record) => insertCurrencyRecord(record, currency)
-                    );
-                    console.log(`[*] Entering ${response.data.length} records to the db for the currency ${currency.code}...`);
-                }
-            }
-        )
-    });
+    for(let cIdx=0; cIdx <= currencies.length-1; cIdx++){
+        let currency = currencies[cIdx];
+
+        let response = getCurrencyDataDaily(currency);
+        if(response.error === true){
+            console.error("[!] Doviz.com auth error, refreshing auth..");
+            updateDovizComAuth();
+            return false;
+        }else{
+            // Process the each record of the currency query
+            response.data.forEach(
+                (record) => insertCurrencyRecord(record, currency)
+            );
+            console.log(`[*] Entering ${response.data.length} records to the db for the currency ${currency.code}...`);
+        }
+    }
+
+    console.error("[*] synchronizeExchangeData function run done.");
+    return true;
 };
 
 // Build the web serving application and serve it
@@ -66,5 +70,9 @@ app.listen(
     async () => {
         console.log(`Express app is running on port ${process.env.PORT}!`);
         await initDatabaseConnection();
+        if(!checkDovizComAuth()){
+            console.error("[!] Doviz.com auth failed, refreshing auth..");
+            await updateDovizComAuth();
+        }
     }
 );

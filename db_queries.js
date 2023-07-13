@@ -110,6 +110,15 @@ const getAllCurrencyCurrentValues = async () => {
     let currencies = await (coll_currenciesToTrack.find({}).sort({timestamp: 1}).toArray());
     currencies = currencies.map(currency => {
         const currentCurrencyValues = allCurrencyValues.filter((record) => (currency.code === record.currency));
+        // Return null if no value exist for the currency
+        if(currentCurrencyValues.length === 0){
+            return {
+                ...currency,
+                values: [],
+                value: null,
+                timestamp: null
+            }
+        }
         return {
             ...currency,
             values: currentCurrencyValues,
