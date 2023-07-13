@@ -45,10 +45,9 @@ let updateDovizComAuth = async () => {
         async (interceptedRequest) => {
             // Check if API request has been made and received "OK" code
             if((await interceptedRequest.url().includes("doviz.com/api/v11/assets/EUR/daily"))){
-                REQUEST_IS_MADE = true;
-
                 // Grab the Auth token from header
                 if(interceptedRequest.headers() && interceptedRequest.headers().authorization){
+                    REQUEST_IS_MADE = true;
                     NEW_AUTH_TOKEN = interceptedRequest.headers().authorization;
                 }
             }
@@ -66,7 +65,7 @@ let updateDovizComAuth = async () => {
     // Wait until request is processed
     while(true){
         if(REQUEST_IS_MADE) break;
-        await ppPage.waitForTimeout(10);
+        await ppPage.waitForTimeout(50);
     }
 
     if(NEW_AUTH_TOKEN != null){
