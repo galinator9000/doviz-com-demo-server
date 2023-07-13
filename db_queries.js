@@ -130,6 +130,42 @@ const getAllCurrencyCurrentValues = async () => {
     return currencies;
 };
 
+// Check the user currency alerts, if they do match the criteria, return true.
+const checkUserCurrencyAlerts = async () => {
+    console.log("[*] Checking currency alert triggers...");
+    
+    // Reconnect with the db
+    await dbclient.connect();
+
+    // Get the collections
+    const coll_userCurrencyAlerts = dbclient.db(MONGODB_DB_NAME).collection("UserCurrencyAlerts");
+    let allUserCurrencyAlerts = await (coll_userCurrencyAlerts.find({}).toArray());
+    const coll_currencyValues = dbclient.db(MONGODB_DB_NAME).collection("CurrencyValues");
+    let allCurrencyValues = await (coll_currencyValues.find({}).toArray());
+
+    // Check the alert criteria from the other collection
+    let triggeredAlerts = allUserCurrencyAlerts.filter((alert) => {
+        let alertIsTriggered = false;
+
+        // Get the currency records
+        const currentCurrencyValues = allCurrencyValues.filter((record) => (alert.currency === record.currency));
+
+        // Determine if the alert is gonna be triggered
+        //// TO DO
+        alertIsTriggered = true;
+
+        return alertIsTriggered;
+    });
+
+    if(triggeredAlerts.length > 0){
+        console.log("[*] Triggered alerts:");
+        console.log(triggeredAlerts);
+    }else{
+        console.log("[*] No alerts triggered.");
+    }
+    return triggeredAlerts;
+}
+
 module.exports = {
     dbclient,
     initDatabaseConnection,
@@ -138,4 +174,5 @@ module.exports = {
     getCurrencyValues,
     getCurrenciesToTrack,
     getAllCurrencyCurrentValues,
+    checkUserCurrencyAlerts
 }

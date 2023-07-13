@@ -5,6 +5,9 @@ require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 
+// Import websocket for exprewss
+var expressWs = require('express-ws');
+
 // Import cron for periodically syncing with doviz.com
 const cron = require('node-cron');
 
@@ -19,7 +22,8 @@ const {
     insertCurrencyRecord,
     getCurrenciesToTrack,
     getCurrencyValues,
-    getAllCurrencyCurrentValues
+    getAllCurrencyCurrentValues,
+    checkUserCurrencyAlerts
 } = require("./db_queries");
 
 // Synchronizes doviz.com data
@@ -52,6 +56,8 @@ const synchronizeExchangeData = async () => {
 // Build the web serving application and serve it
 const app = express();
 
+// Add the extra middlewares.
+expressWs(app);
 app.use(cors());
 
 // API endpoints of our backend-side server application
@@ -67,6 +73,23 @@ app.get('/getCurrenciesToTrack', async (req, res) => {
 app.get('/synchronizeExchangeData', async (req, res) => {
     res.send(await synchronizeExchangeData());
 })
+
+// Setup the alert system through websocket
+app.ws(
+    "/",
+    (ws, req) => {
+        ws.on(
+            "message",
+            (msg) => {
+                if(msg === "CHECK_USER_TRIGGERS"){
+                    checkUserCurrencyAlerts().then(triggeredAlerts => {
+                        ws.send(triggeredAlerts);
+                    })
+                }
+            }
+        );
+    }
+);
 
 app.listen(
     process.env.PORT,
