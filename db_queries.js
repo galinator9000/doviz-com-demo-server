@@ -41,33 +41,46 @@ let closeDatabaseConnection = async () => {
     }
 };
 
-const insertCurrencyRecord = async (record, currency) => {
-    const db_id = md5(JSON.stringify({
-        "timestamp": record.update_date,
-        "currency": currency.code,
-        "value": record.close
-    }));
-    const new_db_record = {
-        "_id": db_id,
-        "timestamp": new Date(record.update_date * 1000),
-        "currency": currency.code,
-        "value": record.close
-    };
-
+const insertCurrencyRecords = async (newRecords, currency) => {
     // Reconnect with the db
     await dbclient.connect();
 
     // Get the collection
     const coll_currencyValues = dbclient.db(MONGODB_DB_NAME).collection("CurrencyValues");
+    const existingDbRecords = await coll_currencyValues.find({currency: currency.code}).toArray();
+    const existingDbRecordIDs = existingDbRecords.map(db_record => db_record._id);
 
-    // Check if the record already exists or not
-    if((await coll_currencyValues.countDocuments({"_id": db_id})) > 0){
-        console.log("[*] Record already exists:", JSON.stringify(new_db_record));
-    }else{
-        // Insert the new record
-        const result = await coll_currencyValues.insertOne(new_db_record);
-        console.log("[*] Entered new record:", JSON.stringify(new_db_record));
-    }
+    // Add the db_id and data object that is going to be sent to the insertOne function, to the given each "newRecords" object
+    newRecords = newRecords.map((record) => {
+        const db_id = md5(JSON.stringify({
+            "timestamp": record.update_date,
+            "currency": currency.code,
+            "value": record.close
+        }));
+        const new_db_record = {
+            "_id": db_id,
+            "timestamp": new Date(record.update_date * 1000),
+            "currency": currency.code,
+            "value": record.close
+        };
+
+        return {
+            ...record,
+            new_db_record: new_db_record
+        };
+    });
+
+    // Check if the id's for matching the records, find the existing and missing records.
+    const checkIfExistsOnDb = (record) => {
+        return existingDbRecordIDs.includes(record.new_db_record._id);
+    };
+    let final_existingRecords = newRecords.filter(checkIfExistsOnDb);
+    let final_newRecords = newRecords.filter((record) => !checkIfExistsOnDb(record));
+    console.log(`[*] Number of ${final_existingRecords.length} already exists for the currency ${currency.code}; adding ${final_newRecords.length} records!`);
+
+    // Insert the new records to the database
+    final_newRecords = final_newRecords.map(record => record.new_db_record);
+    return await coll_currencyValues.insertMany(final_newRecords);
 };
 
 // Gets the given currency's current values held in DB
@@ -286,7 +299,7 @@ module.exports = {
     dbclient,
     initDatabaseConnection,
     closeDatabaseConnection,
-    insertCurrencyRecord,
+    insertCurrencyRecords,
     getCurrencyValues,
     getCurrenciesToTrack,
     getAllCurrencyCurrentValues,

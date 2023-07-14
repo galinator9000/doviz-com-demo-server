@@ -5,8 +5,8 @@ require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 
-// Import websocket for exprewss
-var expressWs = require('express-ws');
+// Import websocket
+const { WebSocketServer } = require('ws');
 
 // Import cron for periodically syncing with doviz.com
 const cron = require('node-cron');
@@ -19,7 +19,7 @@ const {
     dbclient,
     initDatabaseConnection,
     closeDatabaseConnection,
-    insertCurrencyRecord,
+    insertCurrencyRecords,
     getCurrenciesToTrack,
     getCurrencyValues,
     getAllCurrencyCurrentValues,
@@ -62,24 +62,48 @@ const synchronizeExchangeData = async (pullDovizComDataFn) => {
             });
 
             // Process the each record of the currency query
-            dovizComSourceData.forEach(
-                (record) => insertCurrencyRecord(record, currency)
-            );
-            console.log(`[*] Entering ${dovizComSourceData.length} records to the db for the currency ${currency.code}...`);
+            console.log(`[*] Pulled number of ${dovizComSourceData.length} records from doviz.com for the currency ${currency.code}...`);
+            await insertCurrencyRecords(dovizComSourceData, currency);
         }
     }
 
-    console.error("[*] synchronizeExchangeData function run done.");
+    console.log("[*] synchronizeExchangeData function run done.");
     return true;
 };
 
 // Build the web serving application and serve it
 const app = express();
 
+// Setup the alert system through websocket
+const wss = new WebSocketServer({port: process.env.WS_PORT});
+
+// Set the websocket connection functions.
+wss.on('connection', (ws) => {
+    // Trigger the user alert checking functionality here
+    const triggerCheckingUserCurrencyAlerts = async () => {
+        let triggeredAlerts = await checkUserCurrencyAlerts();
+        if(triggeredAlerts.length > 0){
+            ws.send(JSON.stringify(triggeredAlerts));
+        }
+    };
+
+    // Set an interval for running triggerCheckingUserCurrencyAlerts periodically
+    console.log("[*] WebSocket connected");
+    let interval_triggerCheckingUserCurrencyAlerts = setInterval(
+        triggerCheckingUserCurrencyAlerts,
+        (parseInt(process.env.DOVIZCOM_PULL_LIVE_DATA_EVERY_XMINUTES) * 30 * 1000)
+    );
+    
+    ws.on('close', () => {
+        clearInterval(interval_triggerCheckingUserCurrencyAlerts);
+        interval_triggerCheckingUserCurrencyAlerts = null;
+        console.log("[*] Terminating the WebSocket connection");
+    });
+});
+
 app.use(express.json());
 
 // Add the extra middlewares.
-expressWs(app);
 app.use(cors());
 
 // API endpoints of our backend-side server application
@@ -105,23 +129,6 @@ app.post('/removeUserCurrencyAlert', async (req, res) => {
     res.send(await removeUserCurrencyAlert(req.body));
 })
 
-// Setup the alert system through websocket
-app.ws(
-    "/",
-    (ws, req) => {
-        ws.on(
-            "message",
-            (msg) => {
-                if(msg === "CHECK_USER_TRIGGERS"){
-                    checkUserCurrencyAlerts().then((triggeredAlerts) => {
-                        ws.send(JSON.stringify(triggeredAlerts));
-                    })
-                }
-            }
-        );
-    }
-);
-
 app.listen(
     process.env.PORT,
     async () => {
@@ -139,7 +146,11 @@ app.listen(
 
         // Set cron schedules.
         cron.schedule(
-            "*/3 * * * *",
+            `*/${
+                process.env.DOVIZCOM_PULL_LIVE_DATA_EVERY_XMINUTES
+                ? process.env.DOVIZCOM_PULL_LIVE_DATA_EVERY_XMINUTES
+                : '1'
+            } * * * *`,
             () => synchronizeExchangeData(getCurrencyDataLive)
         );
     }

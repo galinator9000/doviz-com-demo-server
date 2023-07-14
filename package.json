@@ -13,7 +13,6 @@
     "cors": "^2.8.5",
     "dotenv": "^16.3.1",
     "express": "^4.18.2",
-    "express-ws": "^5.0.2",
     "md5": "^2.3.0",
     "moment": "^2.29.4",
     "mongodb": "^5.7.0",
@@ -22,6 +21,7 @@
     "puppeteer": "^20.8.2",
     "puppeteer-extra": "^3.3.6",
     "puppeteer-extra-plugin-stealth": "^2.11.2",
-    "sync-fetch": "^0.5.2"
+    "sync-fetch": "^0.5.2",
+    "ws": "^8.13.0"
   }
 }
