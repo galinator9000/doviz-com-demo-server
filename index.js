@@ -128,7 +128,7 @@ app.listen(
 
         // Set cron schedules.
         cron.schedule(
-            "*/1 * * * *",
+            "*/3 * * * *",
             () => synchronizeExchangeData(getCurrencyDataLive)
         );
     }
