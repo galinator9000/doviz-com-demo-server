@@ -123,7 +123,7 @@ let getCurrencyDataLastXHours = (currency, lastXHours) => {
 
 // Gets the specified currency's live records
 let getCurrencyDataLive = (currency) => {
-    const limit = "60";
+    const limit = process.env.DOVIZCOM_PULL_LIVE_RECENT_DATA_COUNT;
 
     // Build the query url
     let query_url = (

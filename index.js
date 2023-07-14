@@ -50,11 +50,22 @@ const synchronizeExchangeData = async (pullDovizComDataFn) => {
             });
             return false;
         }else{
+            let dovizComSourceData = response.data;
+            dovizComSourceData = dovizComSourceData.filter((record) => {
+                let now_timestamp = new Date().getTime() / 1000;
+                let xhrsago_timestamp = (now_timestamp - (3600 * parseInt(process.env.DOVIZCOM_PULL_MAX_X_HOURS_OF_HISTORY)));
+                
+                if(record.update_date >= xhrsago_timestamp){
+                    return true;
+                }
+                return false;
+            });
+
             // Process the each record of the currency query
-            response.data.forEach(
+            dovizComSourceData.forEach(
                 (record) => insertCurrencyRecord(record, currency)
             );
-            console.log(`[*] Entering ${response.data.length} records to the db for the currency ${currency.code}...`);
+            console.log(`[*] Entering ${dovizComSourceData.length} records to the db for the currency ${currency.code}...`);
         }
     }
 
