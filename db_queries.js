@@ -118,28 +118,34 @@ const getAllCurrencyCurrentValues = async () => {
 
     // Get the collections
     const coll_currencyValues = dbclient.db(MONGODB_DB_NAME).collection("CurrencyValues");
-    let allCurrencyValues = await (coll_currencyValues.find({}).sort({timestamp: -1}).toArray());
 
     const coll_currenciesToTrack = dbclient.db(MONGODB_DB_NAME).collection("CurrenciesToTrack");
     let currencies = await (coll_currenciesToTrack.find({}).toArray());
-    currencies = currencies.map(currency => {
-        const currentCurrencyValues = allCurrencyValues.filter((record) => (currency.code === record.currency));
+    currencies = await Promise.all(currencies.map(async (currency) => {
+        const currentCurrencyValues = await (coll_currencyValues.find(
+            {
+                currency: currency.code
+            },
+            {
+                sort: {timestamp: -1},
+                limit: 1
+            }
+        ).toArray());
+
         // Return null if no value exist for the currency
         if(currentCurrencyValues.length === 0){
             return {
                 ...currency,
-                values: [],
                 value: null,
                 timestamp: null
             }
         }
         return {
             ...currency,
-            values: currentCurrencyValues,
             value: currentCurrencyValues[0].value,
             timestamp: currentCurrencyValues[0].timestamp,
         };
-    });
+    }));
 
     return currencies;
 };
