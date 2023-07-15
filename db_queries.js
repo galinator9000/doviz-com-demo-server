@@ -80,7 +80,9 @@ const insertCurrencyRecords = async (newRecords, currency) => {
 
     // Insert the new records to the database
     final_newRecords = final_newRecords.map(record => record.new_db_record);
-    return await coll_currencyValues.insertMany(final_newRecords);
+    if(final_newRecords.length > 0){
+        return await coll_currencyValues.insertMany(final_newRecords);
+    }
 };
 
 // Gets the given currency's current values held in DB
